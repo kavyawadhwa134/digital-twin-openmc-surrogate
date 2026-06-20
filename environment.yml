@@ -1,0 +1,22 @@
+name: digital-twin-openmc-gpu
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.11
+  - openmc
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - h5py
+  - joblib
+  - python-docx
+  - pytorch
+  - pytorch-cuda=12.1
+  - pip
+  - pip:
+      - tqdm
