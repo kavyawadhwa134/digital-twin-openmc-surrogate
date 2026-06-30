@@ -325,7 +325,20 @@ def main() -> None:
         default="state_forecaster",
         help="Artifact name prefix, e.g. state_forecaster_h10 for a 10 s horizon run.",
     )
+    parser.add_argument(
+        "--dynamics",
+        choices=["analytic", "physics"],
+        default="analytic",
+        help="analytic = original hand-written trajectories; physics = point-kinetics + "
+             "thermal-hydraulics ODE integration (simulate_reactor_dynamics.py).",
+    )
     args = parser.parse_args()
+
+    if args.dynamics == "physics":
+        import simulate_reactor_dynamics as srd
+        # Rebind the module-global simulator used by make_many_windows/score_trace/etc.
+        globals()["simulate_state_series"] = srd.simulate_physical_state_series
+        print("Using physics-grounded reactor dynamics (point-kinetics + thermal-hydraulics).")
 
     ensure_project_dirs()
 

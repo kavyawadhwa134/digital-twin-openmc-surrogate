@@ -35,6 +35,9 @@ import time
 from pathlib import Path
 
 import joblib
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
@@ -530,6 +533,66 @@ def honest_speedup(
     }
 
 
+def save_final_models(df, features, targets, agg, base_seed, test_size, name):
+    """Train the CV-preferred model per target on a train split and save model + honest figures.
+
+    The selected model per target is the one most often chosen by CV across the repeats, so the
+    saved artifact matches the honestly-reported metrics (no select-on-test).
+    """
+    train_df, test_df = train_test_split(df, test_size=test_size, random_state=base_seed)
+    chosen = {}
+    bundle_models = {}
+    comparison = test_df.copy()
+    for target in targets:
+        counts = agg[target]["selected_model_counts"]
+        sel = max(counts, key=counts.get)
+        chosen[target] = sel
+        model = build_candidate_models(base_seed)[sel]
+        model.fit(train_df[features], train_df[target].to_numpy())
+        bundle_models[target] = model
+        comparison[f"ml_{target}"] = model.predict(test_df[features])
+    joblib.dump(
+        {"features": features, "targets": targets, "selected_models": chosen, "models": bundle_models},
+        MODEL_DIR / f"{name}_response_surrogate_best.joblib",
+    )
+    comparison.to_csv(PROCESSED_DATA_DIR / f"{name}_surrogate_comparison.csv", index=False)
+
+    # keff parity figure with OpenMC Monte-Carlo error bars
+    plt.figure(figsize=(5.8, 5.4))
+    plt.errorbar(comparison["keff"], comparison["ml_keff"],
+                 xerr=comparison.get("keff_std"), fmt="o", ms=4, capsize=2, alpha=0.7)
+    lo = min(comparison["keff"].min(), comparison["ml_keff"].min())
+    hi = max(comparison["keff"].max(), comparison["ml_keff"].max())
+    plt.plot([lo, hi], [lo, hi], "k-", lw=1.0)
+    k = agg["keff"]
+    plt.xlabel("OpenMC keff"); plt.ylabel("ML surrogate keff")
+    plt.title(f"Pin-cell keff: {chosen['keff']}\n"
+              f"MAE {k['mae_pcm_mean']:.0f}±{k['mae_pcm_std']:.0f} pcm "
+              f"(honest, {len(test_df)}-pt test)")
+    plt.tight_layout()
+    plt.savefig(FIGURE_DIR / f"{name}_keff_parity.png", dpi=220)
+    plt.close()
+
+    # multi-output parity grid
+    plot_targets = [t for t in targets if t in comparison.columns][:8]
+    ncols = 4
+    nrows = int(np.ceil(len(plot_targets) / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(13.0, 3.2 * nrows), squeeze=False)
+    for ax, t in zip(axes.ravel(), plot_targets):
+        ax.scatter(comparison[t], comparison[f"ml_{t}"], s=18, alpha=0.7)
+        lo = min(comparison[t].min(), comparison[f"ml_{t}"].min())
+        hi = max(comparison[t].max(), comparison[f"ml_{t}"].max())
+        ax.plot([lo, hi], [lo, hi], "k-", lw=0.9)
+        ax.set_title(f"{t}\n({chosen[t]}, {agg[t]['relative_mae_mean']*100:.2f}% relMAE)", fontsize=8)
+    for ax in axes.ravel()[len(plot_targets):]:
+        ax.axis("off")
+    fig.suptitle("Multi-output pin-cell surrogate vs OpenMC (honest CV-selected models)", y=1.0)
+    fig.tight_layout()
+    fig.savefig(FIGURE_DIR / f"{name}_multioutput_parity.png", dpi=220)
+    plt.close(fig)
+    return chosen
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -556,6 +619,11 @@ def main() -> None:
         "--fast",
         action="store_true",
         help="Prune slow tree forests and skip the optimism-audit pass (talk-grade, ~minutes).",
+    )
+    parser.add_argument(
+        "--save-final",
+        action="store_true",
+        help="Train the CV-preferred model per target and save a deployable bundle + parity figures.",
     )
     args = parser.parse_args()
 
@@ -605,6 +673,13 @@ def main() -> None:
         "physics_monotonicity": physics,
         "honest_speedup": speed,
     }
+    if args.save_final:
+        chosen = save_final_models(
+            df, features, targets, agg, args.base_seed, args.test_size, args.name
+        )
+        report["final_saved_models"] = chosen
+        print(f"\nSaved deployable surrogate bundle + parity figures ({args.name}). Models: {chosen}")
+
     out_path = MODEL_DIR / f"{args.name}_evaluation.json"
     out_path.write_text(json.dumps(report, indent=2))
 
