@@ -1,24 +1,36 @@
+# NRF: archived / superseded material kept locally but out of the repo
+NRF/
+
+# workshop deliverables (kept locally, not part of the code repo)
+/*.pptx
+/*.pdf
+/*.docx
+/*.tex
+/POSTER_PRESENTER_KIT.md
+
+# large or generated data (regenerable from scripts)
 nuclear_data/
 runs/
 runs/**/*.h5
 runs/**/statepoint.*.h5
 runs/**/summary.h5
-data/raw/
-data/processed/*.csv
-data/processed/*.npz
-data/processed/*.meta.json
+data/
 models/
 figures/
 poster/
+output/
 outputs/
+outputs/rendered_results_doc*/
+
+# workspaces and caches
 backups/
+tmp/
 .cache/
 .gh-config/
 .tmp_abstract_render/
-.Rhistory
 .ipynb_checkpoints/
-outputs/rendered_results_doc*/
 __pycache__/
 *.pyc
 *.pyo
+.Rhistory
 .DS_Store
