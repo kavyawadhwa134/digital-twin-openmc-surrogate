@@ -115,6 +115,12 @@ directories) and the target nuclide list.
 - Lookup timings are measured serially on CPU and on an NVIDIA GTX 1080 Ti.
 - Surrogates in scikit-learn; digital twin in PyTorch; GPU kernels in CuPy.
 
+## Development notes
+
+AI coding assistants were used for some code scaffolding, debugging and
+documentation drafting. The physics modelling, simulation setup, validation
+and interpretation of results are the author's own.
+
 ## License
 
 Research code, released as-is for scientific reproducibility.
